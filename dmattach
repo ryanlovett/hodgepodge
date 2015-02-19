@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Mount a DMG and output the mount point. Do not make the volume visible to
+# the Finder. This is useful for remote software installation.
+
+# Debugging
+# set -x
+
+DMG="$@"
+TMPFILE=`mktemp /tmp/dmg.XXX` &&
+
+# Attach DMG and save info regarding /dev/node and mount point
+hdiutil attach -plist -nobrowse "$DMG" > $TMPFILE &&
+
+loc=":system-entities:"
+num="$(/usr/libexec/PlistBuddy -c "Print :system-entities:" $TMPFILE | \
+	grep -c Dict 2>/dev/null)"
+
+# Go through output looking for our mount point.
+# The <dict/> containing <key>mount-point</key> within the system-entities
+# <array/> does not always appear at the same index. We have to look for it.
+for i in $(seq 0 $((num-1))) ; do
+    loc=":system-entities:${i}:mount-point"
+
+    mp="$(/usr/libexec/PlistBuddy -c "Print ${loc}" $TMPFILE 2>/dev/null)"
+    if [ -n "$mp" -a -z "$(echo $mp | grep 'Does Not Exist')" ]; then
+        break # Found it
+    fi
+done
+
+echo $mp
+
